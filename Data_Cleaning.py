@@ -11,6 +11,7 @@ import time
 import os
 import datetime
 
+
 ## We need a web scraper for this project because I'm not about to download all the data manually. 
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -18,10 +19,10 @@ from selenium.webdriver.support.ui import Select
 from bs4 import BeautifulSoup as bs
 
 ## Lets get our login credentials for the scraper
-#login = input('Login: ')
-#password = input('Password: ')
-startdate = '01012021'
-enddate = '10082021'
+login = input('Login: ')
+password = input('Password: ')
+startdate = '01042021'
+enddate = '05062021'
 DownloadsFilePath = '/home/tmillar/Downloads/Export.CSV'
 
 def database_scrape():
@@ -92,7 +93,7 @@ def clean_data(filename):
             professor = 'No Professor Listed'
         month, day, year = date.split('/')[0], date.split('/')[1], date.split('/')[2]
         weekday = get_weekday(date)
-        outstring = uvid + ',' + date + ',' + weekday + ',' + in_time + ',' + course + ',' + professor + ',' + month + ',' + day + ',' + year + '\n'
+        outstring = uvid + ',' + date + ',' + weekday  + ',' + course + ',' + professor + ',' + month + ',' + day + ',' + year + ',' + in_time + '\n'
         
         out_file.write(outstring) # Write cleaned data
 
@@ -109,38 +110,59 @@ def get_weekday(date):
     return weekday
 
 def filter_data():
-    
-    in_file = open('Clean_data.csv', 'r')
-    cleaned = in_file.readlines()
-    #for sign_in in cleaned:
-        #if SIL_filter(sign_in) == False and duplicate_filter == ###
+    ## lets take a different approach from before and do this in pandas
+    df = pd.read_csv('')
 
 def duplicate_filter():
-    pass
-    '''
-    ## THIS NEEDS TO BE IMPLEMENTED AGAIN
-    sign_in = sign_in.split(',')
-        key = str(sign_in[0] + ', ' + sign_in[5] + ', ' + sign_in[7])
+    in_file = open('Clean_data.csv', 'r')
+    data = in_file.readlines()
+    sign_in_dictionary = {}
+    dupeCount = 0
+    index = 0
+    timepattern = '%H:%M'
 
-        if key not in clean_sign_ins.keys(): ## If the sign in date and person isnt in the dictionary already, 
-            clean_sign_ins[key] = (convert24(sign_in[1].strip('"'))) ## put that in the dictionary
+    if os.path.exists('Dupes.txt'):
+        os.remove('Dupes.txt')
 
-        else: ## if the sign in date and person is already there (potential duplicate)
-            first_time_in = clean_sign_ins[key] ## first time is the one we have in the dictionary
-            second_time_in = convert24(sign_in[1].strip('"')) ## second time is the sign in in questions sign in time
+    duplicates = open('Dupes.txt' , 'a')
+    duplicates.write('I IDed these as duplicates and auto-removed them \n')
+    for sign_in in data:
+        sign_in = sign_in.split(',')
+        key = sign_in[0] + ", " + sign_in[1] + ", " + sign_in[2] + ", " + sign_in[3] + ", " + sign_in[4]
+        if key in sign_in_dictionary.keys():
+            dupeCount = dupeCount + 1
             
-            first_time_in = datetime.datetime.strptime(first_time_in, '%H:%M ') ##Make date time objects
-            second_time_in = datetime.datetime.strptime(second_time_in, '%H:%M ')
+            t1 = datetime.datetime.strptime(sign_in_dictionary[key].strip(), timepattern)
+            t2 = datetime.datetime.strptime(sign_in[-1].strip(), timepattern)
+            
+            delta = t2 - t1
+            delta = delta.total_seconds()
+            if  delta == 0: ## if the sign_ins occur at the same time just delete the second
+                duplicates.write(key)
+                duplicates.write(sign_in_dictionary[key] + sign_in[-1])
+            elif delta <= 300: ## if the sign_ins occur within 5 minutes of one another, just delete the second
+                duplicates.write(key)
+                duplicates.write(sign_in_dictionary[key] + sign_in[-1])
+            else: ## if not, give the user the chance to look over them and delete them if they decide they are dupes. 
+                print(key)
+                print(sign_in_dictionary[key] + sign_in[-1])
+                repeat = input('Is this a duplicate sign in?: [y or n]')
+                if repeat.lower().strip() == 'y':
+                    duplicates.write(key)
+                    duplicates.write(sign_in_dictionary[key] + sign_in[-1])
 
-            delta_time = second_time_in - first_time_in
-
-            if delta_time.total_seconds() > 5400: ## if the difference in time is over 90 minutes
-                key = key + ', legitimate duplicate' ## its a legitimate duplicate, indicate that on the key
-                clean_sign_ins[key] = convert24(sign_in[1].strip('"'))
-            else:
-                continue 
-                ## do nothing, its a duplicate sign-in
-    '''
+                elif repeat.lower().strip() == 'n':
+                    print('Okay ill figure it out') 
+                    ## UNIMPLEMENTED CODE
+                    ## I NEED TO WRITE THIS TO THE OUTFILE
+                    
+                else:
+                    print(key)
+                    print(sign_in_dictionary[key] + sign_in[-1])
+                    repeat = input('Is this a duplicate sign in?: (only accepts [y or n])')
+        else:
+            sign_in_dictionary[key] = sign_in[-1]
+    duplicates.close()
 
 def SIL_filter(sign_in, SILS):
     ## This function checks a sign in to see if that sign in is an SIL, and if so, if they signed into their own class. 
@@ -220,9 +242,9 @@ def all_student_data():
 def main():
     #SILS = read_SILS()
     #database_scrape()
-    clean_data('/home/tmillar/Downloads/Export.CSV') ## This is for debugging purposes
+    #clean_data('/home/tmillar/Downloads/Export.CSV') ## This is for debugging purposes
     #add_course_details()
-    
+    duplicate_filter()
     
 if __name__ == "__main__":
     main()
